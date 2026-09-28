@@ -23,6 +23,7 @@ For anything beyond a trivial fix, please open an issue first so we can agree on
 3. Run `pnpm install`.
 4. Run `pnpm dev` to start compilation in watch mode.
 5. Reload Obsidian (Ctrl/Cmd+R) to pick up changes. The [Hot Reload plugin](https://github.com/pjeby/hot-reload) can help automate this during development.
+6. Run `pnpm build:bundle` to also build the command line interface into `dist/cli.js`, or `pnpm build:cli` to build it on its own. `pnpm dev` watches the plugin bundle only.
 
 For automated testing in real Obsidian and Anki, see [Desktop tests](./test/README.md). With uv installed, `pnpm test` prepares Anki, builds the plugin, and runs the Vitest suite. CI builds on Linux, macOS, and Windows, testing the minimum and latest stable Obsidian apps with the installer matching `minAppVersion`. Lint and type checking run once on Linux.
 

@@ -322,6 +322,75 @@ The Yanki plugin provides a single command, which works as advertised:
 
 **`Yanki: Sync flashcard notes to Anki`**
 
+### Command line interface
+
+Yanki also ships as a command line program, so you can sync from a terminal, a script, or a headless machine without launching Obsidian.
+
+It reads the settings of the Yanki plugin when it can find them, so the same vault synced from the command line and from the plugin produces the same notes in Anki, with the same study progress.
+
+The requirements match the plugin's: Node.js 20.19 or newer, the Anki desktop application, and the AnkiConnect add-on. Linux and macOS are supported. (The stand-alone [`yanki`](https://github.com/kitschpatrol/yanki) CLI tool also works on Windows, but this one is only tested on Linux and macOS.)
+
+Build the CLI from a checkout of this repository:
+
+```sh
+pnpm install
+pnpm build
+```
+
+Run it with `node dist/cli.js`, or link it onto your `PATH` as `yanki-obsidian`:
+
+```sh
+pnpm link --global
+```
+
+#### Commands and options
+
+| Command                             | Behavior                                                           |
+| ----------------------------------- | ------------------------------------------------------------------ |
+| `yanki-obsidian sync [directory]`   | Sync Markdown notes to Anki. This is the default command.          |
+| `yanki-obsidian rename [directory]` | Rename note files to match their content, without syncing to Anki. |
+| `yanki-obsidian config [directory]` | Print the settings and notes a sync would use.                     |
+
+The `directory` argument defaults to the current working directory.
+
+Point it at an Obsidian vault to sync the folders configured in the Yanki plugin's settings, or at any other directory of Markdown notes to sync the whole directory.
+
+```sh
+# Sync the flashcard folders configured in an Obsidian vault
+yanki-obsidian sync ~/Notes/Vault
+
+# Preview a sync of a single folder without changing anything
+yanki-obsidian sync ~/Notes/Vault --folder Flashcards --dry-run
+
+# Sync a plain directory of Markdown notes
+yanki-obsidian sync ~/notes --namespace "Yanki - notes"
+
+# Rename note files to match their content
+yanki-obsidian rename ~/Notes/Vault
+```
+
+Run `yanki-obsidian --help` for the full list of options. In addition to `--folder`, `--namespace`, and `--config`, they include `--anki-connect`, `--anki-key`, `--anki-web`, `--sync-media`, `--manage-filenames`, `--max-filename-length`, `--ignore-folder-notes`, `--strict-line-breaks`, `--dry-run`, `--json`, and `--verbose`.
+
+Syncing is one-way, exactly like the plugin: notes deleted locally are deleted from Anki, and notes in Anki that Yanki didn't create are left alone. Use `--dry-run` to see the report without touching the Anki database.
+
+#### Settings resolution
+
+The CLI resolves settings from the following sources, with later sources winning:
+
+1. The plugin's defaults.
+2. The Yanki plugin's settings file, `.obsidian/plugins/yanki/data.json`, when the synced directory is an Obsidian vault.
+3. The command line flags.
+
+Pass `--config <path>` to read a different settings file, which is also how you point the CLI at a vault that uses a custom Obsidian configuration folder. Settings changed with flags apply to that run only; the CLI never writes to the settings file, so the plugin's settings tab remains the single place to configure a vault.
+
+If the plugin's settings file isn't available, the CLI falls back to deriving the namespace from the Obsidian vault ID, which is the same value the plugin would use. It reads that ID from Obsidian's global configuration, so it only works on a machine where Obsidian has opened the vault at least once.
+
+For a directory that isn't an Obsidian vault, the namespace defaults to `Yanki - <directory name>`, and `rename` uses the name mode from the settings.
+
+> [!CAUTION]
+>
+> Anki notes are recognized by their namespace. If the CLI can't find a settings file or a vault ID, it warns and uses the fallback namespace described above, which is _not_ the same as the plugin's namespace. Syncing such a vault from both the CLI and the plugin would create two copies of every note in Anki. Pass `--namespace` with the value from the plugin's advanced settings in that case.
+
 ### Settings
 
 #### Anki flashcard folders

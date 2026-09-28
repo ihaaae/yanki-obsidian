@@ -4,6 +4,8 @@ These tests run the production bundle in real Obsidian and sync to real Anki. [V
 
 The focus is the plugin boundary: commands and notices, settings UI and persistence, watched folders, file and fetch adapters, metadata cache updates, and plugin lifecycle. Parsing, note types, media permutations, and sync algorithm coverage belong in [yanki](https://github.com/kitschpatrol/yanki).
 
+The [command line tests](./cli.e2e.test.ts) run the built `dist/cli.js` as a subprocess against the same disposable Anki collection. They launch no Obsidian, and cover the CLI boundary: settings resolution, note discovery, the file system, and a real sync from a headless process.
+
 The [sync regression test](./sync.e2e.test.ts) syncs notes into nested decks, adds another note through Obsidian's Vault API, and syncs again. It verifies successful completion, stable existing Anki IDs, frontmatter and metadata cache updates, and an unchanged third sync without duplicate notes. This scenario runs in every supported CI combination.
 
 ## Local setup
@@ -29,6 +31,7 @@ On Linux, install the Qt/Electron libraries listed in [the workflow](../.github/
 | `pnpm test:e2e`                         | Run against the existing `dist/` bundle. Build first after source changes.                                              |
 | `pnpm test:e2e test/plugin.e2e.test.ts` | Run one test file.                                                                                                      |
 | `pnpm test:e2e -t "persists folder"`    | Select tests by name.                                                                                                   |
+| `pnpm test:e2e test/cli.e2e.test.ts`    | Run the command line tests.                                                                                             |
 | `pnpm test:e2e test/sync.e2e.test.ts`   | Run the nested-deck sync regression.                                                                                    |
 
 To test other combinations, set `YANKI_E2E_APP_VERSION` and `YANKI_E2E_INSTALLER_VERSION`. For example, on macOS/Linux:
