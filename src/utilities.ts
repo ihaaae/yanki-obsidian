@@ -142,23 +142,6 @@ export function capitalize(text: string): string {
 }
 
 /**
- * Checks whether a namespace string is valid and already sanitized.
- */
-export function validateNamespace(namespace: string): boolean {
-	const sanitizedNamespace = sanitizeNamespace(namespace)
-	return sanitizedNamespace.length > 0 && namespace === sanitizedNamespace
-}
-
-/**
- * Strips invalid characters (`*`, `:`) from a namespace string.
- */
-export function sanitizeNamespace(namespace: string): string {
-	// Additional sanitization also happens inside Yanki
-	// Stuck with es2020?
-	return namespace.replace(/[*:]/gv, '').trim()
-}
-
-/**
  * Elements with class will call a function when clicked
  */
 export function sanitizeHtmlToDomWithFunction(

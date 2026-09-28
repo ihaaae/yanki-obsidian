@@ -1,9 +1,10 @@
 import type { TAbstractFile } from 'obsidian'
 import type { FetchAdapter, RenameFilesOptions, SyncFilesOptions } from 'yanki'
 import escapeStringRegexp from 'escape-string-regexp'
-import type { YankiPluginSettings } from './settings/settings'
+import type { YankiPluginSettings } from './settings/model'
 import type { CommonProperties } from './utilities'
-import { getYankiPluginDefaultSettings, YankiPluginSettingTab } from './settings/settings'
+import { getYankiPluginDefaultSettings } from './settings/model'
+import { YankiPluginSettingTab } from './settings/settings'
 import {
 	arraysEqual,
 	formatRenameResult,
@@ -37,7 +38,7 @@ import { renameFiles, syncFiles } from 'yanki'
 const DRIVE_LETTER_REGEX = /^[A-Z]:/iv
 
 export default class YankiPlugin extends Plugin {
-	public override settings: YankiPluginSettings = getYankiPluginDefaultSettings(this.app)
+	public override settings: YankiPluginSettings = getYankiPluginDefaultSettings(this.app.appId)
 	private readonly settingsTab: YankiPluginSettingTab = new YankiPluginSettingTab(this.app, this)
 
 	// Arrow-function field so `this.openSettingsTab` can be passed as a callback
