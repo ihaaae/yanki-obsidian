@@ -64,7 +64,7 @@ async function unusedPort(): Promise<number> {
 /** Start a disposable Anki process and provide its connection to Vitest workers. */
 export default async function setup(project: TestProject) {
 	// Fail before starting desktop apps if the production build was omitted.
-	for (const file of ['main.js', 'manifest.json', 'styles.css']) {
+	for (const file of ['main.js', 'manifest.json', 'styles.css', 'cli.js']) {
 		await fs.access(path.resolve('dist', file))
 	}
 
