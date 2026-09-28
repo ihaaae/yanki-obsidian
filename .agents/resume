@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+# Orb resume for yanki-obsidian.
+#
+# Runs after activation and whenever a paused orb wakes. Nothing here needs
+# authentication or reconnection, so this only reports whether the toolchain
+# prepared by .agents/setup is still intact. It stays read-only and always
+# exits 0: a missing cache or dependency tree is recoverable, and blocking the
+# orb start would hide the real state.
+
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$repo_root"
+
+problems=()
+prepared=()
+
+check_command() {
+	if command -v "$1" > /dev/null 2>&1; then
+		prepared+=("$1")
+	else
+		problems+=("$1 is not on PATH")
+	fi
+}
+
+check_path() {
+	if [[ -e "$1" ]]; then
+		prepared+=("$2")
+	else
+		problems+=("$2 is missing at $1")
+	fi
+}
+
+check_command node
+check_command pnpm
+check_command uv
+check_command xvfb-run
+check_path node_modules 'Node dependencies'
+check_path test/.venv/pyvenv.cfg 'Anki environment (test/.venv)'
+check_path dist/main.js 'release bundle (dist/)'
+check_path .cache/obsidian/obsidian-app 'Obsidian download cache'
+
+printf 'Orb resume: %s ready' "$(node -p 'process.versions.node')"
+if ((${#prepared[@]} > 0)); then
+	printf ' (%s)' "${prepared[*]}"
+fi
+
+printf '\n'
+if ((${#problems[@]} > 0)); then
+	printf 'Unprepared: %s\nRun .agents/setup in this repository to restore the environment.\n' "${problems[*]}" >&2
+fi

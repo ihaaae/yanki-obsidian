@@ -35,3 +35,6 @@ resources/
 .venv/
 test-results/
 __pycache__/
+
+# Amp orbs
+.amp/portals/

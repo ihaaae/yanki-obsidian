@@ -1,0 +1,186 @@
+#!/usr/bin/env bash
+# Orb setup for yanki-obsidian.
+#
+# Runs once before a fresh orb starts work: installs the Linux libraries the
+# Obsidian desktop tests need, the Node and Python dependency trees, the
+# release bundle the tests load, and the Obsidian download cache.
+#
+# Every step checks for existing work first, so repeat runs (stale snapshots,
+# repository updates) are fast and safe.
+
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$repo_root"
+
+started=$SECONDS
+
+run_step() {
+	local name="$1"
+	shift
+	local step_started=$SECONDS
+	printf '\n=== %s ===\n' "$name"
+	"$@"
+	printf '=== %s took %ss ===\n' "$name" "$((SECONDS - step_started))"
+}
+
+# Electron and Qt runtime libraries plus a virtual X server for the desktop
+# tests, matching the Linux dependencies in .github/workflows/ci.yml. Orbs are
+# Debian 12, where ALSA's runtime package is libasound2 rather than Ubuntu's
+# libasound2t64.
+install_system_packages() {
+	local packages=(
+		libasound2
+		libatk-bridge2.0-0
+		libatk1.0-0
+		libatspi2.0-0
+		libcairo2
+		libcups2
+		libdrm2
+		libegl1
+		libgbm1
+		libgl1
+		libnss3
+		libopengl0
+		libpango-1.0-0
+		libxcb-cursor0
+		libxcb-icccm4
+		libxcb-image0
+		libxcb-keysyms1
+		libxcb-render-util0
+		libxcb-shape0
+		libxcb-xinerama0
+		libxcomposite1
+		libxdamage1
+		libxkbcommon-x11-0
+		libxkbcommon0
+		libxrandr2
+		libxtst6
+		xvfb
+	)
+
+	local missing=()
+	local package
+	for package in "${packages[@]}"; do
+		if ! dpkg-query -W -f='${Status}' "$package" 2> /dev/null | grep -q 'install ok installed'; then
+			missing+=("$package")
+		fi
+	done
+
+	if ((${#missing[@]} == 0)); then
+		printf 'All desktop test libraries are installed.\n'
+		return
+	fi
+
+	printf 'Installing %d missing packages: %s\n' "${#missing[@]}" "${missing[*]}"
+	local privileged=()
+	if ((EUID != 0)); then
+		privileged=(sudo)
+	fi
+
+	"${privileged[@]}" apt-get update -qq
+	"${privileged[@]}" apt-get install -y --no-install-recommends "${missing[@]}"
+}
+
+# The pinned pnpm from packageManager manages its own version, so a different
+# pnpm in the orb image is fine. A warm run reuses the store in about a second.
+install_node_dependencies() {
+	pnpm install --frozen-lockfile
+}
+
+# uv downloads its managed CPython and syncs test/.venv from test/uv.lock. The
+# desktop tests shell out to this environment for Anki, so it must exist before
+# any test run.
+install_anki_environment() {
+	uv sync --project test --locked --managed-python
+}
+
+# The desktop tests load the release bundle from dist/, so build it here and
+# `pnpm test:e2e` works as soon as the orb starts.
+build_bundle() {
+	pnpm build:bundle --no-demo
+}
+
+# test/support/obsidian.ts downloads Obsidian, its installer, and ChromeDriver
+# into .cache/obsidian on first use, about 400 MB. Warm it once here so the
+# first desktop test run in a fresh orb does not pay for it. A failure is not
+# fatal: the tests download whatever is missing.
+warm_desktop_cache() {
+	if [[ -d .cache/obsidian/obsidian-app ]]; then
+		printf 'Obsidian desktop downloads are already cached.\n'
+		return
+	fi
+
+	mkdir -p .cache
+	cat > .cache/prefetch-obsidian.mjs << 'JAVASCRIPT'
+// Warms the Obsidian download cache used by test/support/obsidian.ts.
+// Mirrors that file's launcher configuration: resolve the app and installer
+// versions, then download Obsidian, its installer, and ChromeDriver. Local
+// plugins stay by reference, so a rebuilt dist/ never goes stale here.
+import fs from 'node:fs/promises'
+import path from 'node:path'
+import { launcher as ObsidianLauncher } from 'wdio-obsidian-service'
+
+const repoRoot = path.resolve(import.meta.dirname, '..')
+const manifest = JSON.parse(await fs.readFile(path.join(repoRoot, 'dist/manifest.json'), 'utf8'))
+const capabilities = {
+	browserName: 'obsidian',
+	browserVersion: process.env.YANKI_E2E_APP_VERSION ?? 'latest',
+	'wdio:obsidianOptions': {
+		installerVersion: process.env.YANKI_E2E_INSTALLER_VERSION ?? manifest.minAppVersion,
+		plugins: [],
+		vault: path.join(repoRoot, 'test/vault'),
+	},
+}
+const options = {
+	cacheDir: path.join(repoRoot, '.cache/obsidian'),
+	capabilities,
+	logLevel: 'warn',
+	rootDir: repoRoot,
+}
+await new ObsidianLauncher({}, capabilities, options).onPrepare(options, [capabilities])
+console.log('Obsidian desktop downloads are cached.')
+JAVASCRIPT
+
+	if node .cache/prefetch-obsidian.mjs; then
+		return
+	fi
+
+	printf 'warning: could not warm the Obsidian download cache. The first desktop test run will download it.\n' >&2
+}
+
+# Tell agents working in this orb what is already prepared and how to run the
+# desktop tests without a display.
+write_agent_guidance() {
+	local guidance="$HOME/.config/amp/AGENTS.md"
+	local marker='# yanki-obsidian orb environment (added by .agents/setup)'
+	if grep -Fqx "$marker" "$guidance" 2> /dev/null; then
+		printf 'Orb guidance is already present.\n'
+		return
+	fi
+
+	mkdir -p "$(dirname "$guidance")"
+	cat >> "$guidance" << 'MARKDOWN'
+
+# yanki-obsidian orb environment (added by .agents/setup)
+
+- Node, pnpm, and uv are installed, and `node_modules`, the uv-managed Anki
+  environment in `test/.venv`, the release bundle in `dist/`, and the Obsidian
+  download cache in `.cache/obsidian` are already populated.
+- The desktop tests need a display, which agent shells do not have. Run them as
+  `xvfb-run --auto-servernum pnpm test:e2e <file>`.
+- `pnpm test` rebuilds the bundle first; `pnpm test:e2e` reuses the existing
+  `dist/`, so rebuild after source changes before running a single test file.
+- This repository has no long-lived service. `pnpm dev` is a build watcher, not
+  a server, so there is nothing to expose through a portal.
+MARKDOWN
+}
+
+run_step 'System packages' install_system_packages
+run_step 'Node dependencies' install_node_dependencies
+run_step 'Anki environment (uv)' install_anki_environment
+run_step 'Production bundle' build_bundle
+run_step 'Obsidian desktop cache' warm_desktop_cache
+run_step 'Orb agent guidance' write_agent_guidance
+
+printf '\nSetup finished in %ss.\n' "$((SECONDS - started))"
