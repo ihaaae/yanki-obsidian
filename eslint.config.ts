@@ -121,4 +121,13 @@ export default eslintConfig(
 			'obsidianmd/prefer-instanceof': 'error',
 		},
 	},
+	{
+		files: ['src/cli/**/*.ts'],
+		rules: {
+			// The CLI runs outside of Obsidian, so there's no Vault API to ask for
+			// the configured folder name. A vault that renames its config folder can
+			// point the CLI at its settings file with `--config`.
+			'obsidianmd/hardcoded-config-path': 'off',
+		},
+	},
 )

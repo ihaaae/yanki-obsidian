@@ -119,7 +119,7 @@ export function validateNamespace(namespace: string): boolean {
 /**
  * Strips invalid characters (`*`, `:`) from a namespace string.
  */
-function sanitizeNamespace(namespace: string): string {
+export function sanitizeNamespace(namespace: string): string {
 	// Additional sanitization also happens inside Yanki
 	// Stuck with es2020?
 	return namespace.replace(/[*:]/gv, '').trim()
