@@ -1,40 +1,21 @@
 # Git Ignore
-# Also used by CSpell, Stylelint, and ESLint
 
-# @kitschpatrol/repo-config boilerplate
-!.env.example
-.astro/
 .DS_Store
 .env
 .env.*
-.eslint-config-inspector
-.pnpm-store/
-.svelte-kit/
-{tmp,temp}/
-**/*.min.js
-/scratch/
-bower_components/
-build/
-coverage/
-dist/
-node_modules/
-vendor/
+*.exe
 
-# Customizations
+# Go
+/yanki
+/dist/
+/vendor/
+coverage.out
+*.test
 
-# Obsidian
-data.json
-.hotreload
-resources/
-/examples/Yanki Demo Vault/.obsidian/workspace.json
-/examples/Yanki Demo Vault/.obsidian/plugins/yanki
-.claude/
-
-# Disposable desktop test environments and diagnostics
-.cache/
-.venv/
-test-results/
-__pycache__/
+# Editors
+.idea/
+.vscode/
 
 # Amp orbs
 .amp/portals/
+.cache/
