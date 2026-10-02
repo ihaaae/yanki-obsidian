@@ -1,38 +1,43 @@
 # Contributing
 
-## Issues
+Thanks for helping improve Yanki.
 
-[Issues](https://github.com/kitschpatrol/yanki-obsidian/issues) are welcome and appreciated.
+## Requirements
 
-Note that most of the functionality of the plugin is actually implemented in the [yanki](https://github.com/kitschpatrol/yanki) CLI tool / TypeScript library repository, not in the Obsidian plugin itself. In many cases, it will make more sense to open an issue in that repo instead of this one.
+- Go 1.24 or newer.
+- The [Anki desktop application](https://apps.ankiweb.net) with the
+  [AnkiConnect](https://ankiweb.net/shared/info/2055492159) add-on, if you want
+  to exercise a real sync.
 
-Please open one issue per feature request or bug report so they can be tracked and resolved individually.
+## Development
 
-If you're reporting a bug, please provide an Obsidian vault folder with the minimal set of notes that can reproduce the problem. This can be zipped and attached to the GitHub issue.
+```sh
+go build ./...              # build everything
+go test ./...               # run the test suite
+go vet ./...                # static checks
+gofmt -l ./cmd ./internal   # formatting check
+```
 
-There's a good chance I will re-title your issue for clarity and consistency, please don't take offense.
+The sync tests use an in-memory fake AnkiConnect server, so they run without
+Anki. When you change behavior that talks to Anki, prefer extending that fake
+over requiring a desktop install.
+
+## Layout
+
+| Path               | Purpose                                                        |
+| ------------------ | -------------------------------------------------------------- |
+| `cmd/yanki`        | The CLI entry point.                                           |
+| `internal/anki`    | Typed AnkiConnect client.                                      |
+| `internal/note`    | Note models, frontmatter, and namespace rules.                 |
+| `internal/markdown`| Markdown → note conversion and HTML rendering.                 |
+| `internal/vault`   | File discovery and deck inference.                             |
+| `internal/config`  | Defaults, TOML loading, and flag overrides.                    |
+| `internal/sync`    | Reconciliation of local notes with Anki.                       |
+| `internal/cli`     | Command definitions and output formatting.                     |
 
 ## Pull requests
 
-For anything beyond a trivial fix, please open an issue first so we can agree on the approach before you invest time in the change. Keep pull requests focused with one logical change per PR, and update the README if you're changing user-visible behavior.
-
-## Development setup
-
-1. Fork and clone the repo. For convenience, you can clone directly into `<YourVault>/.obsidian/plugins/yanki-obsidian/` so changes load in Obsidian without copying files around.
-2. Install [pnpm](https://pnpm.io) if you don't already have it. **Use pnpm — not npm or yarn**; this project's tooling is pinned to it.
-3. Run `pnpm install`.
-4. Run `pnpm dev` to start compilation in watch mode.
-5. Reload Obsidian (Ctrl/Cmd+R) to pick up changes. The [Hot Reload plugin](https://github.com/pjeby/hot-reload) can help automate this during development.
-6. Run `pnpm build:bundle` to also build the command line interface into `dist/cli.js`, or `pnpm build:cli` to build it on its own. `pnpm dev` watches the plugin bundle only.
-
-For automated testing in real Obsidian and Anki, see [Desktop tests](./test/README.md). With uv installed, `pnpm test` prepares Anki, builds the plugin, and runs the Vitest suite. CI builds on Linux, macOS, and Windows, testing the minimum and latest stable Obsidian apps with the installer matching `minAppVersion`. Lint and type checking run once on Linux.
-
-## Code standards
-
-This project uses [`@kitschpatrol/shared-config`](https://github.com/kitschpatrol/shared-config) for linting, formatting, and type checking, orchestrated through the `ksc` CLI. **Run `pnpm fix` before submitting a PR** — it auto-fixes formatting, import sorting, and most lint issues in one shot.
-
-For an overview of code standards enforced byt the config, see the [`ksc` reference](https://github.com/kitschpatrol/shared-config/blob/673c251d774647dd7ee3956d45cb17e17baff39e/packages/repo-config/init/.claude/skills/ksc/SKILL.md).
-
-## License
-
-By contributing, you agree that your contributions will be licensed under the same license as the project (see [`LICENSE`](./LICENSE)).
+- Keep changes focused, and add or update tests for behavior changes.
+- Run `gofmt`, `go vet`, and `go test ./...` before opening a pull request.
+- Match the surrounding code style: small packages, explicit types, and
+  comments that explain why rather than what.

@@ -1,208 +1,71 @@
-<!-- title({titleCase: true, postfix: " Plugin"}) -->
+# Yanki
 
-# Yanki Obsidian Plugin
+**A single static binary that turns a folder of Markdown notes into Anki
+flashcards.** Pure Markdown syntax, no Obsidian, no Node, no plugin.
 
-<!-- /title -->
+Yanki reads Markdown files, infers the right Anki note type from the structure
+of the document, and syncs the result to the Anki desktop application through
+the language-agnostic [AnkiConnect](https://ankiweb.net/shared/info/2055492159)
+protocol.
 
-![Yanki Obsidian Banner](./assets/banner.gif)
+> **Status:** this is a redesign of the original `yanki-obsidian` plugin as a
+> stand-alone Go CLI. The core Markdown → note conversion and sync are
+> implemented and tested. See [Roadmap](#roadmap) for what is still to come.
 
-<!-- badges({
-  npm: [],
-  custom: {
-    "GitHub Release": {
-      image: "https://img.shields.io/github/v/release/kitschpatrol/yanki-obsidian?label=Release",
-      link: "https://github.com/kitschpatrol/yanki-obsidian/releases/latest",
-    },
-    "Obsidian Downloads": {
-      image: "https://img.shields.io/badge/dynamic/json?logo=obsidian&color=%23A88BFA&label=Downloads&query=%24%5B%22yanki%22%5D.downloads&url=https%3A%2F%2Fraw.githubusercontent.com%2Fobsidianmd%2Fobsidian-releases%2Fmaster%2Fcommunity-plugin-stats.json",
-      link: "https://community.obsidian.md/plugins/yanki",
-    },
-  }
-}) -->
+## Why Go
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/license/mit)
-[![CI](https://github.com/kitschpatrol/yanki-obsidian/actions/workflows/ci.yml/badge.svg)](https://github.com/kitschpatrol/yanki-obsidian/actions/workflows/ci.yml)
-[![GitHub Release](https://img.shields.io/github/v/release/kitschpatrol/yanki-obsidian?label=Release)](https://github.com/kitschpatrol/yanki-obsidian/releases/latest)
-[![Obsidian Downloads](https://img.shields.io/badge/dynamic/json?logo=obsidian&color=%23A88BFA&label=Downloads&query=%24%5B%22yanki%22%5D.downloads&url=https%3A%2F%2Fraw.githubusercontent.com%2Fobsidianmd%2Fobsidian-releases%2Fmaster%2Fcommunity-plugin-stats.json)](https://community.obsidian.md/plugins/yanki)
+- A single statically linked binary, no runtime to install.
+- Trivial cross-compilation for Linux, macOS, and Windows.
+- Straightforward, dependency-light HTTP and file system code.
 
-<!-- /badges -->
+## Prerequisites
 
-<!-- short-description -->
+- The [Anki desktop application](https://apps.ankiweb.net).
+- The [AnkiConnect](https://ankiweb.net/shared/info/2055492159) add-on. Install
+  it from Anki's _Tools → Add-ons → Get Add-ons…_ menu with the code
+  `2055492159`, then restart Anki. AnkiConnect must be running while you sync.
 
-**An Obsidian plugin that syncs flashcards from a folder in your vault to Anki. Pure Markdown syntax. No fuss.**
+## Install
 
-<!-- /short-description -->
+```sh
+go install github.com/ihaaae/yanki/cmd/yanki@latest
+```
 
-<!-- toc({ depth: 2 }) -->
+Or build from a checkout:
 
-## Table of contents
-
-- [Overview](#overview)
-- [Quick start](#quick-start)
-- [Features](#features)
-- [Markdown note types](#markdown-note-types)
-- [Usage](#usage)
-- [FAQ](#faq)
-- [Privacy and security](#privacy-and-security)
-- [Background](#background)
-- [Maintainers](#maintainers)
-- [Acknowledgments](#acknowledgments)
-- [Contributing](#contributing)
-- [License](#license)
-
-<!-- /toc -->
-
-## Overview
-
-Yanki is a plugin for Obsidian that syncs a folder (or folders) of notes from your vault to Anki.
-
-The primary novelty of its approach is in how Markdown is translated into Anki notes, and how folders are translated into Anki decks according to a few simple rules:
-
-- **One** Obsidian note maps to **one** Anki note.
-
-- The **structure** of the Markdown in your Obsidian notes determines the **types** of Anki notes they become. No extra syntax or Anki-specific markup is required — just pure Markdown.
-
-  This also means that your flashcard notes remain nice and legible in Obsidian, and you don't have to deal with the cognitive switch of ` ```fenced``` ` regions and Anki's rather noisy templating syntax.
-
-- The **parent folder** of your notes in your Obsidian vault determines their **deck name** in Anki, with any intermediate hierarchies created as needed.
+```sh
+go build -o yanki ./cmd/yanki
+```
 
 ## Quick start
 
-1. **Prerequisites**
+1. Put your flashcard notes in a folder of Markdown files. A note like this:
 
-- The [Obsidian desktop application](https://obsidian.md/download), with both the app and installer version at 1.9.12 or newer. Yanki is tested on Windows, macOS, and Linux.
-- The [Anki desktop application](https://apps.ankiweb.net). (Linux users should install from the Anki Website, [issues have been reported](#my-obsidian-vault-links-arent-opening-on-linux) with Flatpak distributions.)
-- The [AnkiConnect](https://ankiweb.net/shared/info/2055492159) add-on
+   ```md
+   This is the front of the card
 
-  To install the AnkiConnect add-on, open the Anki desktop application and select _Tools → Add-ons_ from the menu, click _Get Add-ons..._, and then enter the code `2055492159` in the field to get AnkiConnect.
+   ---
 
-  AnkiConnect may ask for your permission in the Anki application to connect to Obsidian on the first sync.
+   This is the back of the card
+   ```
 
-  If you encounter trouble with AnkiConnect, please see [the manual configuration procedure](#ive-installed-ankiconnect-but-am-still-getting-connection-errors).
+2. With Anki running, sync the folder:
 
-2. **Plugin installation**
+   ```sh
+   yanki sync ~/Notes/Flashcards
+   ```
 
-   Search for `yanki` in Obsidian's community plugins browser, then click "Install". Or, install it from [the Obsidian website](https://community.obsidian.md/plugins/yanki).
+3. Yanki creates the decks and note types it needs in Anki and adds your cards.
+   On later syncs it updates notes in place, preserving your review progress.
 
-3. **Setup**
+## Note types
 
-   Enable the plugin, and go to its settings tab to select which folders of notes you'd like to sync to Anki. See the section [Markdown note types](#markdown-note-types) on how to format your notes to create different types of Anki cards.
-
-4. **Sync**
-
-   Initiate a sync from Obsidian to Anki using the `Yanki: Sync flashcard notes to Anki` command. You can also trigger a sync manually via the button in the Yanki settings tab.
-
-5. **Study**
-
-   Pop over to the Anki app, and you should see the Obsidian notes from your selected folders organized into decks in Anki that match your vault's folder hierarchy.
-
-## Features
-
-### One Obsidian note = one Anki note
-
-Avoid the complexity of mixing and matching multi-note and single-note syntaxes. One note in Obsidian always yields one Anki note.
-
-### Vault folder hierarchy = Anki deck hierarchy
-
-Yanki uses your Obsidian note's parent folder name as the deck name. Complex folder hierarchies are also supported — Anki decks will be created and nested as needed to match the structure of your vault.
-
-### Embrace Anki's default note types
-
-More note types, more problems.
-
-Yanki _only_ supports turning Markdown into the "Basic", "Basic (and reversed card with extra)", "Basic (type in the answer)", and "Cloze" note types that ship as defaults in the Anki App.
-
-### Infer Anki note type from Markdown structure
-
-Since the number of supported note types is small, the type of Anki note to create from a given Obsidian note can be inferred from a few simple rules about the structure of the Markdown.
-
-For example, a Basic note is any Markdown file with a `---` thematic break splitting the front and back of the card:
-
-```md
-I'm the front of the card.
-
----
-
-I'm the back of the card.
-```
-
-That's it, no extra metadata or Anki-specific markup is required. You're free to use additional Markdown syntax to style the note to your liking.
-
-The structural cues for all four supported note types are described [later in this document](#markdown-note-types).
-
-### Tag support
-
-The values in the `tags` array of your note's properties will be added as tags in Anki. This gives nice interoperability with Obsidian's tag system, which also recognizes the frontmatter `tags` array.
-
-Detecting Obsidian `#tags` in the document body is not currently supported, but plugins like Victor Tao's [Obsidian Linter](https://github.com/platers/obsidian-linter) can automate tag migration from the document body to frontmatter, where Yanki (and thus Anki) can see them.
-
-### Support for Obsidian WikiLinks
-
-Easily jump back to source notes in Obsidian while studying in the Anki desktop application.
-
-The Yanki plugin detects your vault's name, and automatically turns any internal `[[WikiLinks]]` in your notes into deep `obsidian://` protocol links, which you can click through in Anki to get back to the source in Obsidian.
-
-### Fancy Markdown
-
-An extended palette of Markdown syntax is available out of the box, mirroring (almost) all the features supported by Obsidian:
-
-- [GitHub Flavored Markdown](https://github.github.com/gfm/), including `| tables |`, `~~strike-through~~`, `- [x] task lists`, and auto-links.
-- Syntax highlighting via [Shiki](https://shiki.style).
-- GitHub-style [Alerts](https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax#alerts).
-- The aforementioned [WikiLinks](https://github.com/Python-Markdown/markdown/blob/master/docs/extensions/wikilinks.md).
-- [LaTeX formatted mathematical expressions](https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/writing-mathematical-expressions) via Anki's built-in [MathJax](https://www.mathjax.org) rendering support.
-- The [`==highlights==`](https://github.com/ipikuka/remark-flexible-markers) syntax.
-- Compact [furigana](https://en.wikipedia.org/wiki/Furigana) / [Ruby](https://en.wikipedia.org/wiki/Ruby_character) syntax specified by [DenDen Markdown](https://conv.denshochan.com/markdown#ruby), for example: `{東京|とうきょう}` renders as `<ruby>東京<rp>(</rp><rt>とうきょう</rt><rp>)</rp></ruby>`. This matches support in Obsidian provided by the [Markdown Furigana](https://github.com/steven-kraft/obsidian-markdown-furigana) plugin.
-- Obsidian's [block links](https://obsidian.md/help/links#Link+to+a+block+in+a+note), e.g. `[[Some Note#^37066d]]`
-- Obsidian's [heading links](https://obsidian.md/help/links#Link+to+a+heading+in+a+note), e.g. `[[Some Note#Heading]]`
-
-### Intelligent syncing
-
-Your local Obsidian Markdown notes are the single point of truth for what will end up in Anki, but Yanki knows to leave your other Anki notes alone.
-
-When you edit a local Obsidian note, Yanki makes every effort to update rather than recreate it in the Anki database so that review progress is preserved.
-
-When you _do_ want to delete something, it's as simple as deleting it from Obsidian, and it will be removed from the Anki database on the next sync. Protections are in place to prevent deleting Anki notes that weren't initially created by Yanki.
-
-If you use [AnkiWeb](https://ankiweb.net/) to sync your notes to the cloud, Yanki will also trigger this next step in the sync, automating the flow from Markdown → Anki → AnkiWeb in one shot. (Configurable via a [setting](#push-to-ankiweb).)
-
-### Existing notes are untouched
-
-Yanki tags the notes it's in charge of with a hidden field, so it will never touch your existing Anki notes. Yanki also creates and manages the note types it needs in Anki, so your existing note types and customizations remain untouched.
-
-### Note name management
-
-The "one Obsidian note = one Anki note" premise can make for a lot of individual note files, and thinking up and renaming notes as their content is revised can be tedious. So, if you want, Yanki can manage the names of your note files based on their content.
-
-Yanki looks inside each note, and extracts either the text of the "prompt" (e.g. the front of the card in most cases), or the "response" (e.g. the back of the card in most cases) to use as the filename. Truncation, deduplication, and sanitization are all taken care of.
-
-Edge cases are carefully managed to ensure that there's always _some kind_ of best-effort semantically valuable file name assigned.
-
-### Media asset sync
-
-Yanki can sync images, videos, and audio files embedded in your Obsidian notes to Anki's media asset management system. At your option, it can sync local assets, or assets linked via URL, or both, or none.
-
-Yanki automatically manages change detection when you revise assets, and also manages clean-up of synced media assets in Anki when you delete either entire notes or embedded assets in Obsidian.
-
-Both wiki-style `![[something.png]]` and `![markdown](style.png)` asset embedding syntaxes are supported.
-
-## Markdown note types
-
-Yanki automatically infers the _type_ of Note you'd like to create in Anki based on the presence or absence of certain elements in your Markdown.
-
-The rules were designed with Markdown's semantic precedents and visual nature in mind, and are based on the note types that are included as defaults in a fresh installation of Anki. Yanki creates and manages the required note types automatically. Do not create or edit them manually.
-
-The most minimal examples to "trigger" different note types are shown below, but the implementation can handle additional weirdness and will generally do the right thing if it encounters elements that might indicate conflicting note types.
-
-There's no such thing as an invalid note: In the absence of enough Markdown syntax to differentiate your intended note type, Yanki will resort to creating a Basic note with all content on the front, and nothing on the back. This preserves the guarantee that all notes in selected flashcard folders will be synced to Anki one way or another.
-
-You're free to use additional Markdown in your notes to style and structure the front and back of your flashcard notes.
-
-The four supported note types are described below. See the [Yanki Demo Vault](https://github.com/kitschpatrol/yanki-obsidian/tree/main/examples/Yanki%20Demo%20Vault) for additional examples.
+Yanki supports the four note types that ship with Anki, and infers which one to
+create from the structure of the Markdown.
 
 ### Basic
 
-A **basic** card is created from any file with a `---`:
+Any file containing a `---` thematic break becomes a front/back card.
 
 ```md
 This is the front of the card
@@ -214,21 +77,8 @@ This is the back of the card
 
 ### Basic (and reversed card with extra)
 
-Doubling up the `---` identifies the note as being **reversible** (and will result in the generation of two cards in Anki).
-
-_Mnemonic: Twice the `---` for twice the cards._
-
-```md
-Sometimes the answer is the question
-
----
-
----
-
-Sometimes the question is the answer
-```
-
-Yanki deviates slightly from the default Anki reversed card note type by supporting adding optional "extra" content that will appear on the back of both generated cards:
+Doubling the `---` makes the note reversible, producing two cards. An optional
+third section becomes extra content shown on the back of both.
 
 ```md
 Sometimes the answer is the question
@@ -241,14 +91,13 @@ Sometimes the question is the answer
 
 ---
 
-This will appear on the back of both generated cards
+This appears on the back of both generated cards
 ```
 
 ### Basic (type in the answer)
 
-If the last statement in the Markdown file is `_emphasized like this_`, it becomes the type-in-the-answer text in Anki.
-
-<em>Mnemonic: The syntax resembles a `_blank to be filled in_`.</em>
+If the last statement in the file is `_emphasized like this_`, it becomes the
+text the learner must type.
 
 ```md
 Jazz isn't dead
@@ -258,676 +107,154 @@ _It just smells funny_
 
 ### Cloze
 
-Text that is `~~struck through~~` with the [somewhat esoteric double-tilde syntax](https://github.github.com/gfm/#strikethrough-extension-) will be hidden in the card as a _cloze_ deletion:
-
-_Mnemonic: The `~~strike through~~` implies redaction._
+Text wrapped in `~~strikethrough~~` becomes a cloze deletion. Add a `---` for
+back-of-card content, and end a cloze with `_emphasis_` to add a hint.
 
 ```md
 All will be ~~revealed~~.
-```
-
-Multiple clozes are supported, which will create additional cards. You can add a `---` to include back-of-card information as well. Hints are also supported, and are indicated by giving the hint text `_emphasis_` at the end of the cloze strike-through:
-
-```md
-~~All~~ will be ~~revealed _here's a hint_~~.
 
 ---
 
 Additional revelations on the back of the card.
 ```
 
-#### Advanced cloze numbering
-
-By default, clozes are numbered incrementally. For example, the Markdown:
-
-```md
-~~All~~ will be ~~revealed _here's a hint_~~.
-```
-
-Is turned into the following Anki markup:
-
-```text
-{{c1::All}} will be {{c2::revealed::<em>here's a hint</em>}}
-```
-
-In [rare cases](https://github.com/kitschpatrol/yanki-obsidian/issues/4), you might want to take control over cloze numbering — perhaps you want to reveal multiple clozes simultaneously on a single card, or group certain clozes together on a particularly cloze-heavy note.
-
-To support this, Yanki offers some optional extra syntax. A leading one- or two-digit number at the front of your clozed content will be interpreted as the cloze number:
-
-For example:
+Clozes are numbered in order. Prefix a cloze with a number to control its index
+explicitly, which lets several deletions reveal together:
 
 ```md
-~~1 All~~ will be ~~1 revealed _here's a hint_~~.
+~~1 All~~ will be ~~1 revealed~~.
 ```
 
-Yields the following Anki markup:
+## Decks
+
+A note's deck comes from its location. The folder hierarchy relative to the
+longest common ancestor of the synced files becomes the `::`-delimited deck
+hierarchy:
 
 ```text
-{{c1::All}} will be {{c1::revealed::<em>here's a hint</em>}}
+~/Flashcards/Anki/Animals/Biped/Plato.md   → Anki::Animals::Biped
+~/Flashcards/Anki/Animals/Quadruped/Horse.md → Anki::Animals::Quadruped
 ```
 
-The difference is subtle, but note the matching `{{c1`s. This markup yields a single card where both `All` and `revealed` are revealed simultaneously.
+A `deckName` key in a note's frontmatter overrides the inferred deck.
 
-_Note: While you can encloze images, math equations, and other inline-styled syntax, clozing over multiple lines or block elements is not currently supported._
+## Frontmatter
 
-_Note: If you delete one of several clozes from an existing note, previous cards associated with the now-missing cloze will linger in Anki's database. While studying, you may see the message "No cloze found on card. Please either add a cloze deletion, or use the Empty Cards tool." In these cases, you must run the "Tools → Empty Cards..." command from Anki desktop application menu bar._
+Yanki reads a small amount of YAML frontmatter and writes one key back:
 
-_Warning: If you delete one of several implicitly numbered clozes (e.g. `~~hidden~~`) from a note, then study progress will "move" from one cloze to another. For example, if you have three clozes in a note, but then delete the second cloze and sync to Anki, then what was previously the "third" cloze becomes the new "second" cloze, inheriting study progress associated with the now-deleted second cloze. If you plan on editing your cloze notes heavily after the fact, consider using explicit numbering syntax (e.g. `~~1 hidden~~`) instead._
+```yaml
+---
+noteId: 1234567890 # managed by Yanki; do not edit by hand
+tags:
+  - parent/child # `/` becomes Anki's `::` tag hierarchy
+deckName: Custom Deck # optional
+---
+```
 
-## Usage
+The `noteId` is how Yanki recognizes a note across syncs. Deleting a Markdown
+file removes its note from Anki; deleting the `noteId` (or the frontmatter)
+makes the next sync create a fresh note.
 
-### Commands
+## Commands
 
-The Yanki plugin provides a single command, which works as advertised:
+| Command             | Description                                              |
+| ------------------- | -------------------------------------------------------- |
+| `yanki [directory]` | Sync Markdown notes to Anki. This is the default command. |
+| `yanki sync`        | Same as above.                                            |
+| `yanki config`      | Print the settings and note count a sync would use.       |
+| `yanki list`        | List the notes Yanki manages in Anki.                     |
+| `yanki clean`       | Delete every note Yanki manages for the namespace.        |
 
-**`Yanki: Sync flashcard notes to Anki`**
+Useful flags:
 
-### Command line interface
+| Flag                        | Description                                                        |
+| --------------------------- | ------------------------------------------------------------------ |
+| `--folder <path>`           | Sync only this folder (repeatable). Defaults to the whole directory. |
+| `--namespace <name>`        | The namespace used to recognize Yanki's notes in Anki.             |
+| `--dry-run`, `-d`           | Show what would change without modifying Anki.                     |
+| `--anki-connect <url>`      | AnkiConnect URL. Defaults to `http://127.0.0.1:8765`.              |
+| `--anki-key <key>`          | AnkiConnect API key, if your configuration requires one.           |
+| `--anki-web`                | Push to AnkiWeb after syncing locally.                             |
+| `--sync-media <mode>`       | Media sync mode: `off`, `local`, `remote`, or `all`. Not implemented yet. |
+| `--strict-line-breaks`      | Treat single newlines in Markdown as line breaks.                  |
+| `--ignore-folder-notes`     | Skip notes that share their parent folder's name.                  |
+| `--json`                    | Print the result as JSON.                                          |
+| `--verbose`, `-v`           | Print per-note details.                                            |
 
-Yanki also ships as a command line program, so you can sync from a terminal, a script, or a headless machine without launching Obsidian.
+## Configuration
 
-It reads the settings of the Yanki plugin when it can find them, so the same vault synced from the command line and from the plugin produces the same notes in Anki, with the same study progress.
+Yanki looks for a `yanki.toml` in the synced directory, or accepts one with
+`--config`. Command-line flags override the file, and the file overrides the
+built-in defaults.
 
-The requirements match the plugin's: Node.js 20.19 or newer, the Anki desktop application, and the AnkiConnect add-on. Linux and macOS are supported. (The stand-alone [`yanki`](https://github.com/kitschpatrol/yanki) CLI tool also works on Windows, but this one is only tested on Linux and macOS.)
+```toml
+[anki_connect]
+host = "http://127.0.0.1"
+port = 8765
+key = ""
 
-Build the CLI from a checkout of this repository:
+folders = ["Anki"]
+ignore_folder_notes = true
+namespace = "My Notes"
+strict_line_breaks = true
+
+[sync]
+# Media sync is not implemented yet; this setting is reserved for it.
+media_mode = "off"
+push_to_anki_web = false
+```
+
+### Namespaces
+
+A namespace is the label Yanki writes into a hidden `YankiNamespace` field on
+every note it creates, and the only thing it will ever update or delete in Anki.
+Notes that Yanki did not create are never touched.
+
+If you do not set a namespace, Yanki derives one from the directory name
+(`Yanki - <directory>`), so different folders do not collide. Set it explicitly
+if you want a stable name across machines.
+
+## How syncing works
+
+- Each Markdown file is one Anki note. The folder structure supplies the deck.
+- Yanki matches a local file to its Anki note through the `noteId` in the
+  frontmatter. If a note has no ID, Yanki falls back to matching by content.
+- When the content changes, the existing note is updated, so scheduling is kept.
+- When a file disappears, its Anki note is deleted. Decks left empty by the
+  deletion are pruned.
+- Only notes in the active namespace are considered.
+
+## Roadmap
+
+Implemented and covered by tests:
+
+- Markdown → note type inference (Basic, reversed, type-in, cloze)
+- AnkiConnect client, note creation, updates, deletion, and deck pruning
+- Deck inference from the folder hierarchy
+- Frontmatter `noteId`, tags, and `deckName`
+- TOML configuration and the `sync`, `config`, `list`, and `clean` commands
+
+Not yet implemented (tracked for follow-up work):
+
+- Media asset sync (images, audio, video, and remote URLs)
+- Automatic note file renaming based on card content
+- Model style management (`getStyle` / `setStyle` equivalents)
+- Rich Markdown rendering: syntax highlighting, GitHub alerts, `==highlights==`,
+  furigana, math, and Obsidian-style wiki links
+- Filtered-deck handling when reading notes back from Anki
+
+## Development
 
 ```sh
-pnpm install
-pnpm build
+go build ./...     # build everything
+go test ./...      # run the test suite
+go vet ./...       # static checks
+gofmt -l ./cmd ./internal  # formatting check
 ```
 
-Run it with `node dist/cli.js`, or link it onto your `PATH` as `yanki-obsidian`:
-
-```sh
-pnpm link --global
-```
-
-#### Commands and options
-
-| Command                             | Behavior                                                           |
-| ----------------------------------- | ------------------------------------------------------------------ |
-| `yanki-obsidian sync [directory]`   | Sync Markdown notes to Anki. This is the default command.          |
-| `yanki-obsidian rename [directory]` | Rename note files to match their content, without syncing to Anki. |
-| `yanki-obsidian config [directory]` | Print the settings and notes a sync would use.                     |
-
-The `directory` argument defaults to the current working directory.
-
-Point it at an Obsidian vault to sync the folders configured in the Yanki plugin's settings, or at any other directory of Markdown notes to sync the whole directory.
-
-```sh
-# Sync the flashcard folders configured in an Obsidian vault
-yanki-obsidian sync ~/Notes/Vault
-
-# Preview a sync of a single folder without changing anything
-yanki-obsidian sync ~/Notes/Vault --folder Flashcards --dry-run
-
-# Sync a plain directory of Markdown notes
-yanki-obsidian sync ~/notes --namespace "Yanki - notes"
-
-# Rename note files to match their content
-yanki-obsidian rename ~/Notes/Vault
-```
-
-Run `yanki-obsidian --help` for the full list of options. In addition to `--folder`, `--namespace`, and `--config`, they include `--anki-connect`, `--anki-key`, `--anki-web`, `--sync-media`, `--manage-filenames`, `--max-filename-length`, `--ignore-folder-notes`, `--strict-line-breaks`, `--dry-run`, `--json`, and `--verbose`.
-
-Syncing is one-way, exactly like the plugin: notes deleted locally are deleted from Anki, and notes in Anki that Yanki didn't create are left alone. Use `--dry-run` to see the report without touching the Anki database.
-
-#### Settings resolution
-
-The CLI resolves settings from the following sources, with later sources winning:
-
-1. The plugin's defaults.
-2. The Yanki plugin's settings file, `.obsidian/plugins/yanki/data.json`, when the synced directory is an Obsidian vault.
-3. The command line flags.
-
-Pass `--config <path>` to read a different settings file, which is also how you point the CLI at a vault that uses a custom Obsidian configuration folder. Settings changed with flags apply to that run only; the CLI never writes to the settings file, so the plugin's settings tab remains the single place to configure a vault.
-
-If the plugin's settings file isn't available, the CLI falls back to deriving the namespace from the Obsidian vault ID, which is the same value the plugin would use. It reads that ID from Obsidian's global configuration, so it only works on a machine where Obsidian has opened the vault at least once.
-
-For a directory that isn't an Obsidian vault, the namespace defaults to `Yanki - <directory name>`, and `rename` uses the name mode from the settings.
-
-> [!CAUTION]
->
-> Anki notes are recognized by their namespace. If the CLI can't find a settings file or a vault ID, it warns and uses the fallback namespace described above, which is _not_ the same as the plugin's namespace. Syncing such a vault from both the CLI and the plugin would create two copies of every note in Anki. Pass `--namespace` with the value from the plugin's advanced settings in that case.
-
-### Settings
-
-#### Anki flashcard folders
-
-##### Watched folder list
-
-> [!CAUTION]
->
-> Use care when editing or deleting folders from this list, since notes from the removed folders will be deleted from Anki (along with their review statistics) on the next sync.
-
-Yanki will sync notes in the vault folders specified here to Anki.
-
-Anki decks will be created automatically to match the hierarchy of your Obsidian folders.
-
-Selecting multiple folders from different parts of your vault is fine, they'll just end up in different Anki decks.
-
-Folder syncing is always recursive: You can add a top-level folder to the watched folder list, and all sub-folders will be synced as well under eponymous deck names.
-
-In addition to adding / removing entries from settings, you can also add or remove folders from the watched folder list via /context menus in the Obsidian File explorer side bar. (The "Add to Yanki" and "Remove from Yanki" entries.)
-
-The way that folders and flashcard notes are mapped to Anki decks is somewhat nuanced to accommodate the case of syncing the root folder of a vault.
-
-In general: **Decks are created, as needed, _if there is a note in a given part of the folder hierarchy_.**
-
-For example, syncing `/Flashcards` with this folder structure:
-
-```plaintext
-📂 Flashcards
-└── 📂 Subdeck
-   ├── 📝 Note A.md
-   └── 📝 Note B.md
-```
-
-Will yield the following deck in Anki, because `/Flashcards` does not contain multiple items:
-
-```plaintext
-Subdeck
-```
-
-If you add a second folder to `/Flashcards` in Obsidian, you still won't get a `Flashcards` deck in Anki since it doesn't contain any notes directly, for example:
-
-```plaintext
-📁 Flashcards
-├── 📁 Subdeck
-│  ├── 📝 Note 1.md
-│  └── 📝 Note 2.md
-└── 📁 Subdeck B
-   ├── 📝 Note 1.md
-   └── 📝 Note 2.md
-```
-
-Yields the following decks in Anki:
-
-```plaintext
-Subdeck
-Subdeck B
-```
-
-If you then add a _note_ to the root of `/Flashcards` in Obsidian:
-
-```plaintext
-📁 Flashcards
-├── 📝 Note 1.md
-├── 📁 Subdeck
-│  ├── 📝 Note 1.md
-│  └── 📝 Note 2.md
-└── 📁 Subdeck B
-   ├── 📝 Note 1.md
-   └── 📝 Note 2.md
-```
-
-Then you'll get the full hierarchy in Anki:
-
-```plaintext
-Flashcards
-Flashcards::Subdeck
-Flashcards::Subdeck B
-```
-
-The idea here is that you can sync a folder of folders in Obsidian, without necessarily including top-level folder as a deck. (For example in my personal use of Yanki, I have an `/Anki` folder in the root of my Obsidian vault with many subfolders that I sync, but I don't want all of my synced cards to be inside an `Anki` deck.)
-
-> [!TIP]
->
-> If you really want to put multiple decks in a noteless parent deck, you can add a note in the parent deck's folder in Obsidian, and then suspend the card in Anki after the next sync.
->
-> _Thank you to user [mzietzke](https://github.com/mzietzke) for this suggestion._
-
-##### Ignore folder notes
-
-When enabled, notes matching the name of their parent folder will not be synced. This is useful if you use the [folder notes](https://github.com/LostPaul/obsidian-folder-notes) plugin to keep a top-level note per folder.
-
-_Default: Enabled_
-
-#### Sync settings
-
-##### Push to AnkiWeb
-
-There are (potentially) three places your note data lives:
-
-1. The Obsidian application — Markdown notes, the single source of truth.
-2. The Anki application — The local database of notes.
-3. AnkiWeb — Anki's first-party note syncing service, which brings your notes to the browser and the Anki mobile app.
-
-"Syncing" in Yanki is focused on going from 1 → 2, but when the "Push to AnkiWeb" option is enabled, Yanki will ask the Anki Desktop application to take care of syncing from 2 → 3. (Basically the equivalent of pushing the "Sync" button in the Anki Desktop app.)
-
-This happens on a best-effort basis, since Yanki doesn't get any feedback on whether syncing forward to AnkiWeb worked or not, so your mileage may vary.
-
-_Default: Enabled_
-
-##### Sync media assets
-
-Copy any images, videos, or audio file assets linked in your Obsidian notes to Anki's media asset library. This option allows your Obsidian media to appear in the Anki desktop application, and to sync to the Anki mobile app.
-
-A "media asset" is any file referenced via the wiki-style `![[something.png]]` or `![markdown](style.png)` asset embedding syntax in your notes.
-
-Internally, Yanki hashes assets before they're copied into Anki to make sure they're only copied as necessary. Yanki also takes care of cleaning up and unreferenced media assets automatically on every sync.
-
-Options:
-
-- **All**
-  Sync all media assets linked in your notes, including local and remote media links.
-
-- **Local only** _(Default)_
-  Only sync assets from your vault's attachments directory or other local paths. This includes any assets linked with the `file:` protocol, and any `paths/to/local/assets.png` outside your Obsidian vault.
-
-- **Remote only**
-  Only sync assets that are "hot-linked" via a remote URL. This includes any assets linked with the `http:` or `https:` protocols.
-
-  _Note that syncing remote media assets can slow down the sync process, since each asset has to be downloaded. If you usually have access to the web where / when you're using Anki, syncing remote assets is probably not worth it._
-
-- **None**
-  Don't sync any media assets. Any assets in your vault that are only available locally via a relative path _will not_ appear in the Anki desktop application and mobile app. Hot-linked remote assets _will_ appear assuming you have internet access while using Anki.
-
-Note that the Anki desktop application and mobile apps are somewhat constrained in the types of media they can display. Please see the [document on file formats](https://github.com/kitschpatrol/yanki/blob/main/docs/file-formats.md) from the Yanki CLI tool repository for additional details, recommendations, and a full format compatibility matrix.
-
-_Default: Local only_
-
-#### Automatic note name settings
-
-##### Automatic note names
-
-This dropdown setting controls when local note files are renamed to match their content. This is useful if you want to have semantically reasonable note file names without the exertion of managing note titles yourself.
-
-Options:
-
-- **Off**\
-  Automatic renaming is disabled. Note files will only be renamed when manually triggered via the "Rename now" button in the settings tab.
-
-- **On Sync**\
-  Note files are automatically renamed before syncing to Anki. This happens whenever a sync is triggered (manually or automatically), ensuring that file names are updated just before the sync operation. This option is useful if you want to control when the potentially disruptive file renaming happens, limiting it to sync operations rather than on every file change.
-
-- **On Change**\
-  Note files are automatically renamed whenever their content changes. This provides the most immediate feedback, updating file names shortly after you modify a flashcard note.
-
-If the prompt or response has multiple lines, only the first line of text is considered.
-
-Automatic renaming only affects notes inside a [watched folder](#watched-folder-list).
-
-Any links _to_ your flashcard notes should auto-update to reflect the change. (This depends on your Obsidian settings, and you may be prompted to approve the link updates.)
-
-There are community plugins dedicated to content-driven file naming, but this feature is built into Yanki since the renaming process can be more precise when the structure of flashcard notes is understood.
-
-Automatic renaming is **not compatible with Obsidian Sync**. If you use Obsidian Sync, please ensure this option remains "Off".
-
-_Default: Off_
-
-##### Name mode
-
-If [Automatic note names](#automatic-note-names) is set to "On Sync" or "On Change", this setting allows you to prioritize which part of the flashcard note should be used for the automatic note file name.
-
-- **Prompt**\
-  This option sets the note title to the first line of text Anki shows you during a review session — usually the front of the card.
-
-- **Response**\
-  This option sets the note title to the first line of text revealed in Anki after a tap or click — usually the back of the card, or the elided text of a cloze card, or the answer text of a type in the answer card.
-
-For edge cases, like notes with empty prompt content or no response content, Yanki will fall back to the other parts of the card to try provide a semantically useful title for the note. If, after every effort, no reasonable title can be identified, then "Untitled" will be used as the note title.
-
-Sanitization, truncation, and sequential numbering of duplicate note titles are all handled automatically by Yanki.
-
-_Default: Prompt_
-
-_(But note that [Automatic note names](#automatic-note-names) must be set to "On Sync" or "On Change" for this to take effect.)_
-
-##### Maximum note name length
-
-Yanki will truncate long automatic file names with ellipses. This setting allows you to specify, in characters, how long of an automatic title you would like (exclusive of the truncation ellipses and file extension). Note that a (generous) upper limit is enforced to comply with operating system limitations.
-
-_Default: 60 characters_
-
-#### AnkiConnect settings
-
-These are advanced settings to accommodate custom AnkiConnect configurations. The defaults are almost certainly fine.
-
-Please see the [AnkiConnect documentation](https://git.sr.ht/~foosoft/anki-connect) for details on the Host and Key options.
-
-#### Advanced settings
-
-Toggle the advanced section to reveal options related to synchronization statistics, verbose logging, and certain edge cases.
-
-##### Verbose notices
-
-Enable to see additional details in synchronization notices.
-
-##### Sync stats
-
-Keep track of how many Obsidian notes have been synchronized to Anki, how these synchronizations were initialized, and how the notes were updated. This can be useful for debugging.
-
-##### Automatic sync
-
-> [!WARNING]
->
-> The Automatic sync option has been moved to the "Advanced settings" area as of Yanki version 1.6.0.
->
-> A simple slip-up in the plugin settings or when moving notes between folders can result in loss of review stats or card history in Anki.
-
-When enabled, Yanki will observe the notes in your [watched folders](#watched-folder-list) for changes, additions, deletions, etc, and trigger a sync to Anki (almost) immediately after it sees a change.
-
-When disabled, syncing must be initiated manually either via [a command](#commands) or the "Sync now" button in the setting tab.
-
-_Default: Disabled_
-
-##### Namespace
-
-> [!CAUTION]
->
-> **Please understand _exactly_ what you're doing before changing this value.**
->
-> A mistake risks losing your progress in Anki.
-
-Behind the scenes, Yanki stamps every Anki note it creates with a "namespace" value that's unique to a given Obsidian vault. By default, it uses the internal ID of the Obsidian vault where the plugin is installed as the namespace, which might look like `Yanki Obsidian - Vault ID d81ea38dabfc7854`. This ensures that you can use Yanki in multiple Obsidian vaults (or separately via CLI) without interference.
-
-Every time Yanki syncs, it takes care to only ever touch notes in Anki with a matching namespace.
-
-Yanki sets the namespace value to the vault ID _once_ the first time it runs in a vault, and saves it to its plugin settings data file for future use.
-
-_Default: `Yanki Obsidian - Vault ID $YOUR_VAULT_ID`_
-
-Scenarios where you might need to touch the namespace value include:
-
-- **Vault Migration**\
-  If you're moving your Yanki flashcard notes from one vault to another, you will want to set this value _before_ the first sync in the new vault to match the namespace string from your _previous_ vault. It's critical that the format matches the entire string exactly, e.g. `Yanki Obsidian - Vault ID d81ea38dabfc7854`, not just `d81ea38dabfc7854` (Where `d81ea38dabfc7854` is your unique Obsidian vault ID).
-
-  Alternately, you can do a find / replace inside Anki to change the `YankiNamespace` field from your old vault ID to the one shown in the Yanki plugin's advanced settings section in your new vault.
-
-- **Vault Synchronization**\
-  I don't use the first-party [Obsidian Sync](https://obsidian.md/sync) service, so your mileage may vary. If it works how I would expect it to, then the Yanki plugin's settings file should be synchronized across locations, and in that case even if each synced Obsidian instance has a different local vault ID, it should still pick up and use the "first" vault's namespace ID in both locations via the shared settings file.
-
-  If you're using a custom / third-party syncing approach, then it's up to you to understand what's going on and to ensure that the namespace field in the Yanki plugin's settings exactly matches between each instance of Obsidian you're trying to sync, and also exactly matches the value in the `YankiNamespace` field of your existing Yanki-synced Anki notes.
-
-If you're not sure, feel free to [open an issue on GitHub](https://github.com/kitschpatrol/yanki-obsidian/issues) describing what you're trying to do and I will be happy to help you. Regardless, please make backups of both your Obsidian Markdown files and your Anki notes database before attempting changes to the namespace value.
-
-You can read more about the lower-level details of how namespaces work in the [Yanki CLI tool documentation](https://github.com/kitschpatrol/yanki?tab=readme-ov-file#namespaces).
-
-### Additional resources
-
-[@emisjerry](https://github.com/emisjerry) has published several very thorough Mandarin-language videos walking through Yanki and illustrating some advanced use-cases:
-
-- [Obs162｜Obsidian's simple and easy-to-use new Anki plugin: Yanki](https://youtu.be/CE6iNxBGBTc)
-- [Obs163｜Yanki Plugin for Creating Anki Cloze Deletion Flashcards, and the Fill-in-the-Blank Template](https://youtu.be/DQ9DFKPugpQ)
-- [Obs164｜Steps to create Anki flashcards from an English article, using Yanki, ChatGPT, Note Splitter](https://www.youtube.com/watch?v=Gu6B7nqUV9o)
-- [Obs165｜Generate Mandarin Phonetic Anki Flashcards with Copilot (ChatGPT) and Yanki](https://www.youtube.com/watch?v=Y-CkNWFmGCE)
-
-_(Note that some of the examples in the videos demonstrate editing model templates that have been generated by Yanki, which can interfere with future updates to the plugin.)_
-
-## FAQ
-
-### Why do I have to come up with a name for every note
-
-You don't! Set the [Automatic note names](#automatic-note-names) setting to "On Sync" or "On Change".
-
-### Does Yanki work with Obsidian's mobile apps?
-
-No, and it probably never will since it needs to communicate with a running instance of the Anki desktop app. (I suppose it's technically feasible with some network contortions, but that's not anything I'd wish on anyone. There's also the [AnkiconnectAndroid](https://github.com/KamWithK/AnkiconnectAndroid) project which shows promise, but to my knowledge there's no similar project for iOS and I don't plan to support the Yanki plugin on a single mobile platform.)
-
-### Does Yanki work with Anki's mobile apps?
-
-Yes, so long as you're syncing your notes to the mobile app through something like [AnkiWeb](https://ankiweb.net/about).
-
-### Do I really have to launch Anki for syncing to work?
-
-Yes, unfortunately. There are other ways to talk to the Anki database, but none are as robust as what's provided by [AnkiConnect](https://ankiweb.net/shared/info/2055492159), which is where this requirement comes from.
-
-_Note: The stand-alone [Yanki](https://github.com/kitschpatrol/yanki) CLI tool can automatically launch the Anki desktop application on-demand on macOS, but Obsidian's plug-in APIs prevent this from working correctly from inside Obsidian._
-
-### Can I move cards in Obsidian?
-
-Yes, as long as they stay within a folder registered in the Yanki plugin's settings, they will continue to sync. Yanki simply moves the cards to whatever deck reflects the new parent folder in Obsidian on the next sync.
-
-### How many notes can I sync?
-
-Hundreds, at least. Not sure of a practical upper limit yet, [let me know](https://github.com/kitschpatrol/yanki-obsidian/issues) if you hit one.
-
-There's some room for optimization in the current sync implementation.
-
-### How do I delete a note?
-
-Just delete it from Obsidian, or move it to a folder that Yanki isn't set up to watch. It will be deleted from Anki on the next sync. (You can re-add it, but any review history associated with the cards in Anki will have been lost.)
-
-### Can I edit notes in the Anki app?
-
-No, Obsidian is the source of truth.
-
-_Technically_ nothing's stopping you from making edits in Anki, but any changes to or deletions of Yanki-managed notes from inside the Anki desktop application or mobile app will be overwritten on the next sync.
-
-### Do I have to run the sync command every time I change a flashcard note?
-
-Not necessarily. Yanki features an auto-sync mode which detects changes automatically and trigger a sync. While this feature technically works, it is _not recommended_ for general use since it can make it too easy to lose learning progress if you temporarily delete a note or move it out of the folders that Yanki tracks.
-
-For those who dare, it can be enabled in the "advanced" section of Yanki's settings page via the [Automatic sync](#automatic-sync) toggle.
-
-### Can I embed images in my notes?
-
-Yes — and sound, and video. See the [media asset syncing options](#sync-media-assets) for details.
-
-### Can I create custom note types / models?
-
-No, Yanki only supports the four note types described in the [Markdown note types](#markdown-note-types) section, which match the functionality of the default note types that ship with Anki.
-
-If you need fancy note types and advanced templating, the [other Obsidian Anki plugins](#other-obsidian-anki-plugins) offer different trade-offs on the simplicity vs. flexibility continuum, and are likely to cover your desired use-case.
-
-### Can I edit the note types / models Yanki creates?
-
-This is not recommended. Yanki depends on the presence of specific fields to sync correctly, and may change and regenerate the note models in future versions to implement new features. If you need advanced formatting or automation, it's recommended to implement this in Obsidian with Markdown and plugins like [Templater](https://silentvoid13.github.io/Templater/).
-
-### Does Yanki take over my entire Anki library?
-
-No, it only touches the notes it creates. However, it's recommended to avoid deck name collisions between your existing Anki notes and notes synced by Yanki. (Though even then Yanki should leave your existing notes alone.)
-
-### What's the `noteId` property added to my Obsidian notes?
-
-It's Anki's internal ID for the note, which is saved after the first sync.
-
-### Can I delete the `noteId`?
-
-Don't. If it goes missing, Yanki might consider the ID-less note in Anki to be an orphan, and it might be deleted from Anki on the next sync and replaced with a fresh note with a new ID. If this happens, you won't lose your note because it's safe in Obsidian, but you _will_ lose stats in Anki, so touch the `noteId` property at your own peril.
-
-### What happens if I accidentally delete a `noteId`?
-
-On the next sync, Yanki will do its best to find the previously-synced note and restore the associated `noteId` in your Obsidian file's properties / Markdown frontmatter. This process depends on a perfect match between the content of your local Markdown note and the previously-synced note in Anki, so it might not work 100% of the time if additional changes have been made to your local note. Better not to find out.
-
-### Seeing `noteId` everywhere is annoying...
-
-Shield your eyes with a [CSS snippet](https://obsidian.md/help/snippets):
-
-```css
-div.metadata-property[data-property-key='noteId'] {
-  display: none;
-}
-```
-
-### What happens if I duplicate a note that has a `noteId`?
-
-Yanki will try to preserve the `noteId` of the note that matches what's been synced to Anki in the past, and will create new `noteId`s for the remaining duplicates. But this is a bit risky due to the limits of the content-matching algorithm, and is therefore not recommended.
-
-### Can I add other properties?
-
-Yes, add all the properties / Markdown frontmatter you'd like, as long as it's valid YAML. Yanki will preserve and ignore all of it except for the `tags` and `noteId` fields.
-
-### Can I sync my entire Obsidian vault to Anki?
-
-Yes. Specify `/` as your watched folder path to sync an entire vault. In this case, Yanki will use the name of your vault's containing folder as the top-level deck name in Anki.
-
-### Can I migrate my flashcard notes from one vault to another?
-
-Yes, but if you want to preserve your learning progress in Anki then this involves updating the "namespace" value either in the Yanki plugin's advanced settings, or in Anki itself. See the [namespace](#namespace) section for more information and please proceed with caution.
-
-### Does Yanki work with Obsidian Sync?
-
-In theory, Yanki should work with the first-party [Obsidian Sync](https://obsidian.md/sync) service, and possibly with additional third-party syncing solutions. In practice, I don't use these services myself so testing has been limited. See the [namespace](#namespace) section for more information and please proceed with caution.
-
-[Issues have been reported](https://github.com/kitschpatrol/yanki-obsidian/issues/56) when Obsidian Sync is combined with the [Automatic Note Names](#automatic-note-names) feature, so it's recommended to _disable_ automatic note name management if you're using Obsidian Sync.
-
-### If I use the [folder notes](https://github.com/LostPaul/obsidian-folder-notes) plugin, will my folder notes become Anki notes?
-
-No. The Yanki plugin has a [settings option](#ignore-folder-notes) to ignore folder notes, which is enabled by default.
-
-### I've installed AnkiConnect, but am still getting connection errors
-
-If the automatic permission request fails, you might need to configure AnkiConnect to accept connections from Obsidian.
-
-In Anki, select _Tools → Add-ons_ from the menu, then select _AnkiConnect_ from the list, and click the _Config_ button in the lower right. In the ensuing modal, add `"app://obsidian.md"` to the `webCorsOriginList` array, like so:
-
-```json
-{
-  "apiKey": null,
-  "apiLogPath": null,
-  "ignoreOriginList": [],
-  "webBindAddress": "127.0.0.1",
-  "webBindPort": 8765,
-  "webCorsOrigin": "http://localhost",
-  "webCorsOriginList": ["http://localhost", "app://obsidian.md"]
-}
-```
-
-### Will `$SOME_FANCY_PLUGIN` work with Yanki?
-
-It depends, if the plugin parses non-standard Markdown and renders complex or interactive HTML in your notes in Obsidian, then it might not translate correctly to Anki.
-
-Under the hood, Yanki uses its own Markdown → HTML rendering pipeline, and its own CSS stylesheets, so what you see in Obsidian is not always exactly what you'll get in Anki. See the [supported Markdown features](#fancy-markdown) for a sense of what's possible.
-
-### My Obsidian vault links aren't opening on Linux
-
-Linux users who have installed Anki with Flatpak / Flathub have [reported](https://github.com/kitschpatrol/yanki-obsidian/issues/31) [issues](https://github.com/kitschpatrol/yanki-obsidian/issues/41) with `obsidian://` URI links in Anki cards failing to open in Obsidian, as well as trouble with with media asset synchronization from Obsidian to Anki.
-
-It's recommended that Linux users install Anki by following the [instructions on the official Anki website](https://docs.ankiweb.net/platform/linux/installing.html) to avoid these issues.
-
-In some cases, Linux users might need to [manually register](https://amir.rachum.com/obsidian-uri-linux/) the `obsidian://` URI scheme with their operating system.
-
-### My Obsidian images aren't syncing to Anki on Linux
-
-Linux users who have installed Anki with Flatpak / Flathub have [reported](https://github.com/kitschpatrol/yanki-obsidian/issues/55) problems syncing media assets like images from Obsidian to Anki.
-
-Ensure that both Obsidian and Anki have access to the local network, and give Anki read-only access to your Obsidian vault's directory using a tool like [Flatseal](https://flathub.org/en/apps/com.github.tchx84.Flatseal).
-
-It's recommended that Linux users install Anki by following the [instructions on the official Anki website](https://docs.ankiweb.net/platform/linux/installing.html) to avoid these issues.
-
-### Can I edit my notes in a way that will change their Anki note model type?
-
-Yes, with a few caveats: Certain note type transformations will result in "leftover" cards in the database, which Yanki will attempt to resolve at the end of the sync by automatically calling the Anki desktop application's "Tools → Check Database" menu command.
-
-Changing note types can also result in lost learning progress if the new model type has fewer cards than the old one.
-
-### Why do I have blank cards?
-
-If you remove a cloze from a card that has several, this can result in leftover [empty cards](https://docs.ankiweb.net/templates/errors.html#single-empty-cards) with a message like "No cloze found on card. Please either add a cloze deletion, or use the Empty Cards tool."
-
-There's no way for Yanki to automatically resolve this condition with the available Anki APIs, so you will have to invoke the Anki desktop application's "Tools → Empty Cards..." menu command to clean up empty cards.
-
-### Can I create filtered decks?
-
-Yes, as of version 1.8.0 Yanki can coexist with filtered decks created manually in the Anki desktop or mobile applications. Yanki will continue to sync notes from Obsidian to to a deck matching their containing Obsidian folder name, and should ignore any filtered decks.
-
-### Can I split multiple cards from a single note across multiple decks?
-
-No. The Anki application lets you split the cards from a single note across multiple decks. (E.g. you might have a card with dozens of clozes, some of which you want to study under a different deck.)
-
-Yanki does _not_ support this scenario for the notes / cards it manages — it maintains a strict hierarchical relationship in which a note and its cards always live in a single deck. Notes may be deleted / recreated and study progress might be lost if you attempt to split up a note's cards.
-
-### Can I mix regular Anki note syntax into my Markdown?
-
-No. "Native" Anki syntax like the `{{c1::...` cloze markup cannot coexist peacefully with Yanki's Markdown-style notes. And in rare cases, doing this can cause sync errors.
-
-### I'm stuck on an old version of Obsidian, can I still use Yanki?
-
-Older releases of the plugin provide compatibility back to Obsidian installer version 1.5.0, which was originally released in November 2023.
-
-### I'm getting a mysterious `TypeError` when I sync
-
-The current Yanki release supports Obsidian 1.9.12 or newer, including the installer version, which can differ from the app version.
-
-Obsidian's in-app updates don't update its underlying Electron, Chromium, and V8 components. If you originally installed an older version of Obsidian, these components may lack functions Yanki needs, causing errors even when the app appears up to date.
-
-To check your app and installer versions, open **Settings → General**, or run `Show debug info` from Obsidian's command palette. If your installer is older than 1.9.12, follow Obsidian's [installer update instructions](https://obsidian.md/help/updates#Installer+updates) and try to sync again.
-
-## Privacy and security
-
-### Network use
-
-By default, the Yanki plugin sends the content and linked media assets of any Obsidian notes in the [watched folders](#watched-folder-list) you've specified to the Anki desktop application via local loopback networking.
-
-From there, both Anki and Obsidian may send this data on to other networks, such as the [AnkiWeb](https://ankiweb.net/about) synchronization service or [Obsidian Sync](https://obsidian.md/sync). Please see AnkiWeb's [terms](https://ankiweb.net/account/terms) and [privacy policy](https://ankiweb.net/account/privacy), and Obsidian's [terms](https://obsidian.md/terms) and [privacy policy](https://obsidian.md/privacy) for more details.
-
-If ["remote" asset syncing](#sync-media-assets) is enabled, Yanki will fetch the headers for any linked media URLs in your flashcard notes to detect changes.
-
-Network communication is implemented with Obsidian's [request APIs](https://docs.obsidian.md/Reference/TypeScript+API/requestUrl).
-
-### File access
-
-Yanki will only access files outside of your vault when they're explicitly linked as absolute paths inside your flashcard notes. It needs to access these files to check them for changes via a temporary content hash, and for asset syncing.
-
-When [asset syncing](#sync-media-assets) syncing is enabled, the Yanki plugin aggregates paths to any asset files linked in your flashcard notes — some of which could be absolute paths to files _outside_ of your local vault on your local filesystem, or links to files on remote servers. These paths and assets may be passed on to other networks, as described in the [Network use](#network-use) section.
-
-File access is implemented with Obsidian's [vault APIs](https://docs.obsidian.md/Reference/TypeScript+API/Vault).
-
-### Local logging
-
-For debugging purposes, Yanki maintains simple local counters of how many notes have been synced successfully. Yanki doesn't send these statistics anywhere, and they are accessible to you in the [Advanced](#advanced-settings) section of the plugin's setting tab.
-
-## Background
-
-### Implementation notes
-
-The Yanki plugin is built on [`yanki`](https://github.com/kitschpatrol/yanki), a command line tool and TypeScript library that handles all the Markdown wrangling and communication with Anki. All functionality not specifically related to Obsidian is managed under the [`yanki`](https://github.com/kitschpatrol/yanki) project repository, including extensive automated tests and additional documentation.
-
-If you want to sync Markdown like the Yanki plugin does from outside of Obsidian, the stand-alone [`yanki`](https://github.com/kitschpatrol/yanki) CLI tool and TypeScript library implements all of the same core features (plus a few extras). Using the `yanki` CLI tool directly will not interfere with syncing from the Yanki plugin.
-
-The [`yanki`](https://github.com/kitschpatrol/yanki) CLI tool and library is built on top of [`yanki-connect`](https://github.com/kitschpatrol/yanki-connect), which is a layer of TypeScript over the [AnkiConnect](https://git.sr.ht/~foosoft/anki-connect) API.
-
-### Avoiding lock-in
-
-Obsidian implements a number of useful extensions to Markdown for supporting things like `[[wiki-links]]` and `![[embedding]]` — and its ecosystem of plugins brings even more useful but Obsidian-specific functionality. Unfortunately, the nuances of many aspects of Obsidian's treatment of Markdown are imperfectly documented, closed-source, and non-standard.
-
-Every Obsidian-only plugin, Markdown extension, and proprietary-API creates a degree of lock-in — intentional or otherwise. Yes, your notes are "just" Markdown files, but where their utility or upkeep depend on Obsidian-specific features, their portability and future flexibility are diminished.
-
-Obsidian's great for now, but it's inevitably transitory. Markdown is going to be around much longer than Obsidian will.
-
-For this reason, I'm trying to ensure that the tools I write for my own workflows are "Markdown first" and as context-agnostic as possible, behaving identically whether invoked directly as stand-alone tools or through an Obsidian plugin command. That's why the Yanki Obsidian plugin is architected as a very thin wrapper over the underlying stand-alone [CLI version of Yanki](https://github.com/kitschpatrol/yanki).
-
-This approach is not without compromise. Unlike most plugins, Yanki does its own Markdown → HTML rendering instead of relying on Obsidian for this task. This is great for future-proofing the project, but it does mean that even though I've reimplemented many of Obsidian's special Markdown features in the renderer, what you see in Obsidian won't _always_ be what you get in Yanki due to potential differences in how Obsidian and your particular menagerie of plugins define custom Markdown syntax and translate it to HTML.
-
-### Other Obsidian Anki plugins
-
-- [Export to Anki / Obsidian\_to\_Anki](https://github.com/ObsidianToAnki/Obsidian_to_Anki)
-- [AnkiBridge](https://github.com/JeppeKlitgaard/ObsidianAnkiBridge)
-- [Flashcards](https://github.com/reuseman/flashcards-obsidian)
-- [Anki Sync](https://github.com/debanjandhar12/Obsidian-Anki-Sync)
-- [Note Synchronizer](https://github.com/tansongchen/obsidian-note-synchronizer)
-- [Awesome Flashcard](https://github.com/AwesomeDog/obsidian-awesome-flashcard)
-- [Auto Anki](https://github.com/cadrianxyz/obsidian-auto-anki)
-- [text2anki-openai](https://github.com/manibatra/obsidian-text2anki-openai)
-- [AnkiSync+](https://github.com/RochaG07/anki-sync-plus)
-
-## Maintainers
-
-[kitschpatrol](https://github.com/kitschpatrol)
-
-## Acknowledgments
-
-Thanks to Alex Yatskov for creating [AnkiConnect](https://git.sr.ht/~foosoft/anki-connect).
-
-PJ Eby's [Hot-Reload](https://github.com/pjeby/hot-reload) Obsidian plugin is a huge help during development.
-
-Obsidian plugins by [Daniel Rodríguez Rivero](https://github.com/danielo515) and [Liam Cain](https://github.com/liamcain) provided helpful examples of common patterns.
-
-## Contributing
-
-[Issues](https://github.com/kitschpatrol/yanki-obsidian/issues) are welcome and appreciated.
-
-Please open _one_ issue per feature request or bug report so they can be tracked and resolved individually.
-
-If you're reporting a bug, please provide an Obsidian Vault folder with the minimal set of notes that can reproduce the problem. This can be zipped and attached to the GitHub issue created for the bug.
-
-<!-- license -->
+The test suite includes an in-memory fake AnkiConnect server, so the sync tests
+run without Anki installed.
 
 ## License
 
-[MIT](LICENSE) © [Eric Mika](https://ericmika.com)
-
-<!-- /license -->
+MIT. See [LICENSE](./LICENSE).
