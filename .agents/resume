@@ -1,11 +1,9 @@
 #!/usr/bin/env bash
-# Orb resume for yanki-obsidian.
+# Orb resume for yanki.
 #
-# Runs after activation and whenever a paused orb wakes. Nothing here needs
-# authentication or reconnection, so this only reports whether the toolchain
-# prepared by .agents/setup is still intact. It stays read-only and always
-# exits 0: a missing cache or dependency tree is recoverable, and blocking the
-# orb start would hide the real state.
+# Runs after activation and whenever a paused orb wakes. It stays read-only and
+# always exits 0: a missing toolchain or module cache is recoverable, and
+# blocking the orb start would hide the real state.
 
 set -euo pipefail
 
@@ -16,10 +14,10 @@ problems=()
 prepared=()
 
 check_command() {
-	if command -v "$1" > /dev/null 2>&1; then
+	if command -v "$1" > /dev/null 2>&1 || [[ -x "$2" ]]; then
 		prepared+=("$1")
 	else
-		problems+=("$1 is not on PATH")
+		problems+=("$1 is not installed")
 	fi
 }
 
@@ -31,21 +29,15 @@ check_path() {
 	fi
 }
 
-check_command node
-check_command pnpm
-check_command uv
-check_command xvfb-run
-check_path node_modules 'Node dependencies'
-check_path test/.venv/pyvenv.cfg 'Anki environment (test/.venv)'
-check_path dist/main.js 'release bundle (dist/)'
-check_path .cache/obsidian/obsidian-app 'Obsidian download cache'
+check_command go /usr/local/go/bin/go
+check_path go.sum 'Go module checksums'
 
-printf 'Orb resume: %s ready' "$(node -p 'process.versions.node')"
 if ((${#prepared[@]} > 0)); then
-	printf ' (%s)' "${prepared[*]}"
+	printf 'Ready: %s\n' "${prepared[*]}"
 fi
 
-printf '\n'
 if ((${#problems[@]} > 0)); then
-	printf 'Unprepared: %s\nRun .agents/setup in this repository to restore the environment.\n' "${problems[*]}" >&2
+	printf 'Not ready: %s\n' "${problems[*]}"
 fi
+
+exit 0
